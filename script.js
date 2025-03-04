@@ -1,11 +1,14 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+let width, height;
 
-// Set canvas size
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-const width = canvas.width;
-const height = canvas.height;
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+}
+
+window.addEventListener('resize', resize);
+resize();
 
 // Dialogue elements
 const dialogue = document.getElementById('dialogue');
@@ -13,7 +16,7 @@ const statement = document.getElementById('statement');
 const agreeBtn = document.getElementById('agree');
 const disagreeBtn = document.getElementById('disagree');
 
-// Opinion statements (placeholders, replace with your political-compass data)
+// Opinion statements (replace with your political-compass data)
 const opStats = [
     "Everyone deserves a second chance.",
     "Hard work should always be rewarded.",
@@ -22,12 +25,41 @@ const opStats = [
     "Change is usually a good thing."
 ];
 
-// Star class
+// Matrix utility functions
+function multiplyMatrices(m1, m2) {
+    let result = [[0,0,0], [0,0,0], [0,0,0]];
+    for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+            for (let k = 0; k < 3; k++) {
+                result[i][j] += m1[i][k] * m2[k][j];
+            }
+        }
+    }
+    return result;
+}
+
+function multiplyMatrixVector(matrix, vector) {
+    return [
+        matrix[0][0]*vector[0] + matrix[0][1]*vector[1] + matrix[0][2]*vector[2],
+        matrix[1][0]*vector[0] + matrix[1][1]*vector[1] + matrix[1][2]*vector[2],
+        matrix[2][0]*vector[0] + matrix[2][1]*vector[1] + matrix[2][2]*vector[2]
+    ];
+}
+
+function transpose(m) {
+    return [
+        [m[0][0], m[1][0], m[2][0]],
+        [m[0][1], m[1][1], m[2][1]],
+        [m[0][2], m[1][2], m[2][2]]
+    ];
+}
+
 class Star {
     constructor() {
-        this.x = Math.random() * 2000 - 1000;
-        this.y = Math.random() * 2000 - 1000;
+        this.x = Math.random() * 1000 - 500;
+        this.y = Math.random() * 1000 - 500;
         this.z = Math.random() * 1000;
+        this.baseSize = Math.random() * 1 + 0.5; // Size range 0.5 to 1.5
         this.resetColorAndOpStat();
         this.lastX = 0;
         this.lastY = 0;
@@ -55,48 +87,64 @@ class Star {
         }
     }
 
-    update() {
-        this.z -= 1; // Speed of falling
+    update(speed) {
+        this.z -= speed;
         if (this.z < 1) {
+            this.x = Math.random() * 1000 - 500;
+            this.y = Math.random() * 1000 - 500;
             this.z = 1000;
-            this.x = Math.random() * 2000 - 1000;
-            this.y = Math.random() * 2000 - 1000;
             this.resetColorAndOpStat();
         }
     }
 
     draw() {
-        const scale = 1000 / this.z;
-        const x = this.x * scale + width / 2;
-        const y = this.y * scale + height / 2;
-        const size = 2 * scale;
-
-        // Glow effect for golden stars
-        if (this.color === '#FFD700') {
-            ctx.fillStyle = 'rgba(255, 215, 0, 0.3)';
-            const glowSize = size * 2;
-            ctx.fillRect(x - glowSize / 2, y - glowSize / 2, glowSize, glowSize);
+        const pos = [this.x, this.y, this.z];
+        const rotated_pos = multiplyMatrixVector(viewMatrix, pos);
+        if (rotated_pos[2] > 0) {
+            const scale = focal_length / rotated_pos[2];
+            const x = rotated_pos[0] * scale + width / 2;
+            const y = rotated_pos[1] * scale + height / 2;
+            const size = Math.max(1, scale * this.baseSize); // No glowFactor
+            ctx.beginPath();
+            ctx.fillStyle = this.color;
+            ctx.fillRect(x - size / 2, y - size / 2, size, size);
+            this.lastX = x;
+            this.lastY = y;
+            this.lastSize = size;
         }
-
-        ctx.fillStyle = this.color;
-        ctx.fillRect(x - size / 2, y - size / 2, size, size);
-
-        this.lastX = x;
-        this.lastY = y;
-        this.lastSize = size;
     }
 }
 
 // Game state
 const stars = Array.from({ length: 1000 }, () => new Star());
-let pitch = -0.48; // Fixed pitch after 8s of 'W'
-let yaw = 0;
+const speed = 1; // Matches original speed
+const focal_length = 1000; // Matches original focal length
 let score = 0;
 const rewards = {
     '#99FF66': 1,
     '#66FFFF': 2,
     '#9966FF': 4
 };
+
+// Fixed view matrix (no user rotation, slight downward tilt like "falling to earth")
+const pitch = -0.48; // Adjust if too steep or flat
+const yaw = 0;
+const cosPitch = Math.cos(pitch);
+const sinPitch = Math.sin(pitch);
+const R_x = [
+    [1, 0, 0],
+    [0, cosPitch, -sinPitch],
+    [0, sinPitch, cosPitch]
+];
+const cosYaw = Math.cos(yaw);
+const sinYaw = Math.sin(yaw);
+const R_y = [
+    [cosYaw, 0, sinYaw],
+    [0, 1, 0],
+    [-sinYaw, 0, cosYaw]
+];
+const R = multiplyMatrices(R_y, R_x);
+const viewMatrix = transpose(R);
 
 // Click handler
 canvas.addEventListener('click', (e) => {
@@ -113,7 +161,7 @@ canvas.addEventListener('click', (e) => {
             clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
             if (star.color === '#FFD700') {
                 score += 10;
-                star.z = 0; // Remove golden star after click
+                star.z = 0; // Remove golden star
             } else {
                 openDialogue(star);
             }
@@ -140,26 +188,10 @@ function openDialogue(star) {
 
 // Animation loop
 function animate() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
-    ctx.fillRect(0, 0, width, height);
-
-    // Apply rotation
-    const cosP = Math.cos(pitch);
-    const sinP = Math.sin(pitch);
-    const cosY = Math.cos(yaw);
-    const sinY = Math.sin(yaw);
+    ctx.clearRect(0, 0, width, height); // Full clear like original
 
     stars.forEach(star => {
-        // Rotate around x-axis (pitch)
-        const y1 = star.y * cosP - star.z * sinP;
-        const z1 = star.y * sinP + star.z * cosP;
-        // Rotate around y-axis (yaw, fixed at 0)
-        const x = star.x * cosY + z1 * sinY;
-        const z = -star.x * sinY + z1 * cosY;
-        star.y = y1;
-        star.z = z;
-
-        star.update();
+        star.update(speed);
         star.draw();
     });
 
