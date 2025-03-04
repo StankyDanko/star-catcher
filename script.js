@@ -16,7 +16,7 @@ const statement = document.getElementById('statement');
 const agreeBtn = document.getElementById('agree');
 const disagreeBtn = document.getElementById('disagree');
 
-// Opinion statements (replace with your political-compass data)
+// Opinion statements (replace with your actual op-stats)
 const opStats = [
     "Everyone deserves a second chance.",
     "Hard work should always be rewarded.",
@@ -40,9 +40,9 @@ function multiplyMatrices(m1, m2) {
 
 function multiplyMatrixVector(matrix, vector) {
     return [
-        matrix[0][0]*vector[0] + matrix[0][1]*vector[1] + matrix[0][2]*vector[2],
-        matrix[1][0]*vector[0] + matrix[1][1]*vector[1] + matrix[1][2]*vector[2],
-        matrix[2][0]*vector[0] + matrix[2][1]*vector[1] + matrix[2][2]*vector[2]
+        matrix[0][0] * vector[0] + matrix[0][1] * vector[1] + matrix[0][2] * vector[2],
+        matrix[1][0] * vector[0] + matrix[1][1] * vector[1] + matrix[1][2] * vector[2],
+        matrix[2][0] * vector[0] + matrix[2][1] * vector[1] + matrix[2][2] * vector[2]
     ];
 }
 
@@ -59,7 +59,7 @@ class Star {
         this.x = Math.random() * 1000 - 500;
         this.y = Math.random() * 1000 - 500;
         this.z = Math.random() * 1000;
-        this.baseSize = Math.random() * 1 + 0.5; // Size range 0.5 to 1.5
+        this.baseSize = Math.random() * 3 + 2; // Size range 2 to 5 for easier clicking
         this.resetColorAndOpStat();
         this.lastX = 0;
         this.lastY = 0;
@@ -68,13 +68,11 @@ class Star {
 
     resetColorAndOpStat() {
         const r = Math.random();
-        if (r < 1 / 10800) { // Golden star, ~once every 180s
+        if (r < 1 / 10800) { // Golden star, rare
             this.color = '#FFD700';
-            this.opStat = null;
         } else if (r < 0.7) { // White stars, 70%
             this.color = 'white';
-            this.opStat = null;
-        } else { // Colored stars, 30%
+        } else { // Colored stars, 30% total
             const rColored = Math.random();
             if (rColored < 0.6667) { // 20% of total
                 this.color = '#99FF66';
@@ -83,8 +81,9 @@ class Star {
             } else { // 3% of total
                 this.color = '#9966FF';
             }
-            this.opStat = opStats[Math.floor(Math.random() * opStats.length)];
         }
+        // All stars get an opStat for dialogue
+        this.opStat = opStats[Math.floor(Math.random() * opStats.length)];
     }
 
     update(speed) {
@@ -104,7 +103,7 @@ class Star {
             const scale = focal_length / rotated_pos[2];
             const x = rotated_pos[0] * scale + width / 2;
             const y = rotated_pos[1] * scale + height / 2;
-            const size = Math.max(1, scale * this.baseSize); // No glowFactor
+            const size = Math.max(1, scale * this.baseSize);
             ctx.beginPath();
             ctx.fillStyle = this.color;
             ctx.fillRect(x - size / 2, y - size / 2, size, size);
@@ -117,17 +116,21 @@ class Star {
 
 // Game state
 const stars = Array.from({ length: 1000 }, () => new Star());
-const speed = 1; // Matches original speed
-const focal_length = 1000; // Matches original focal length
+const speed = 1;
+const focal_length = 1000;
 let score = 0;
+
+// Define rewards per star
 const rewards = {
-    '#99FF66': 1,
-    '#66FFFF': 2,
-    '#9966FF': 4
+    '#FFD700': 10,      // Gold: 10 points
+    'white': 0.1,       // White: 0.1 points (10 = 1 point)
+    '#99FF66': 1 / 6,   // ~0.1667 points (6 = 1 point)
+    '#66FFFF': 1 / 3,   // ~0.3333 points (3 = 1 point)
+    '#9966FF': 1        // 1 point
 };
 
-// Fixed view matrix (no user rotation, slight downward tilt like "falling to earth")
-const pitch = -0.48; // Adjust if too steep or flat
+// Fixed view matrix with slight downward tilt
+const pitch = -0.48;
 const yaw = 0;
 const cosPitch = Math.cos(pitch);
 const sinPitch = Math.sin(pitch);
@@ -154,17 +157,10 @@ canvas.addEventListener('click', (e) => {
 
     for (let i = stars.length - 1; i >= 0; i--) {
         const star = stars[i];
-        if (star.color === 'white') continue;
-
         const { lastX, lastY, lastSize } = star;
         if (clickX >= lastX - lastSize / 2 && clickX <= lastX + lastSize / 2 &&
             clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
-            if (star.color === '#FFD700') {
-                score += 10;
-                star.z = 0; // Remove golden star
-            } else {
-                openDialogue(star);
-            }
+            openDialogue(star);
             break;
         }
     }
@@ -175,7 +171,13 @@ function openDialogue(star) {
     dialogue.style.display = 'block';
 
     const onInteract = () => {
-        score += rewards[star.color];
+        // Ensure reward exists to prevent NaN
+        if (rewards.hasOwnProperty(star.color)) {
+            score += rewards[star.color];
+        } else {
+            console.error(`No reward defined for color: ${star.color}`);
+            score += 0; // Default to no change if undefined
+        }
         dialogue.style.display = 'none';
         star.z = 0; // Remove star after interaction
         agreeBtn.removeEventListener('click', onInteract);
@@ -188,21 +190,21 @@ function openDialogue(star) {
 
 // Animation loop
 function animate() {
-    ctx.clearRect(0, 0, width, height); // Full clear like original
+    ctx.clearRect(0, 0, width, height);
 
     stars.forEach(star => {
         star.update(speed);
         star.draw();
     });
 
-    // Draw score
+    // Display "Level" as the integer part of the score
     ctx.save();
     ctx.font = 'bold 24px Arial';
     ctx.fillStyle = '#FFD700';
     ctx.shadowColor = 'black';
     ctx.shadowBlur = 5;
     ctx.textAlign = 'right';
-    ctx.fillText(`Score: ${score}`, width - 10, 30);
+    ctx.fillText(`Level: ${Math.floor(score)}`, width - 10, 30);
     ctx.restore();
 
     requestAnimationFrame(animate);
