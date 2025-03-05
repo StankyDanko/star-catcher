@@ -210,7 +210,7 @@ function openDialogue(star, clickX, clickY) {
     const dialogueWidth = dialogue.offsetWidth;
     const dialogueHeight = dialogue.offsetHeight;
     let left = clickX - dialogueWidth / 2;
-    let top = clickY + 50; // 50 pixels below the click
+    let top = clickY - 50; // 50 pixels above the click
     if (left < 0) left = 0;
     if (left + dialogueWidth > width) left = width - dialogueWidth;
     if (top + dialogueHeight > height) top = height - dialogueHeight;
