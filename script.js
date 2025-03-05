@@ -1,3 +1,40 @@
+// Firebase initialization
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBXaY6hn6NDJI6WEy1mvtGRXl6V5_W7HJs",
+    authDomain: "sd-opinion-statements.firebaseapp.com",
+    projectId: "sd-opinion-statements",
+    storageBucket: "sd-opinion-statements.firebasestorage.app",
+    messagingSenderId: "702007524321",
+    appId: "1:702007524321:web:9b25faa3203a3b621af0a0"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Op-Stat queue management
+let opStatQueue = [];
+
+async function loadOpStats() {
+    const querySnapshot = await getDocs(collection(db, "op-stats"));
+    const allOpStats = querySnapshot.docs.map(doc => doc.data());
+    const shuffled = shuffleArray(allOpStats);
+    opStatQueue = opStatQueue.concat(shuffled.slice(0, 20));
+}
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// Load initial op-stats when the game starts
+loadOpStats();
+
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let width, height;
@@ -15,15 +52,6 @@ const dialogue = document.getElementById('dialogue');
 const statement = document.getElementById('statement');
 const agreeBtn = document.getElementById('agree');
 const disagreeBtn = document.getElementById('disagree');
-
-// Opinion statements (replace with your actual op-stats)
-const opStats = [
-    "Everyone deserves a second chance.",
-    "Hard work should always be rewarded.",
-    "Sometimes rules need to be bent for the greater good.",
-    "Tradition keeps society strong.",
-    "Change is usually a good thing."
-];
 
 // Matrix utility functions
 function multiplyMatrices(m1, m2) {
@@ -54,12 +82,13 @@ function transpose(m) {
     ];
 }
 
+// Star class
 class Star {
     constructor() {
         this.x = Math.random() * 1000 - 500;
         this.y = Math.random() * 1000 - 500;
         this.z = Math.random() * 1000;
-        this.baseSize = Math.random() * 3 + 2; // Size range 2 to 5 for easier clicking
+        this.baseSize = Math.random() * 3 + 2;
         this.resetColorAndOpStat();
         this.lastX = 0;
         this.lastY = 0;
@@ -68,22 +97,32 @@ class Star {
 
     resetColorAndOpStat() {
         const r = Math.random();
-        if (r < 1 / 10800) { // Golden star, rare
-            this.color = '#FFD700';
-        } else if (r < 0.7) { // White stars, 70%
-            this.color = 'white';
-        } else { // Colored stars, 30% total
+        if (r < 1 / 10800) {
+            this.color = '#FFD700'; // Gold, rare
+        } else if (r < 0.7) {
+            this.color = 'white';   // White, common
+        } else {
             const rColored = Math.random();
-            if (rColored < 0.6667) { // 20% of total
-                this.color = '#99FF66';
-            } else if (rColored < 0.9) { // 7% of total
-                this.color = '#66FFFF';
-            } else { // 3% of total
-                this.color = '#9966FF';
+            if (rColored < 0.6667) {
+                this.color = '#99FF66'; // Green
+            } else if (rColored < 0.9) {
+                this.color = '#66FFFF'; // Cyan
+            } else {
+                this.color = '#9966FF'; // Purple
             }
         }
-        // All stars get an opStat for dialogue
-        this.opStat = opStats[Math.floor(Math.random() * opStats.length)];
+        this.assignOpStat();
+    }
+
+    assignOpStat() {
+        if (opStatQueue.length > 0) {
+            this.opStat = opStatQueue.shift();
+        } else {
+            this.opStat = { text: "Loading...", type: "placeholder" };
+            loadOpStats().then(() => {
+                this.opStat = opStatQueue.shift() || this.opStat;
+            });
+        }
     }
 
     update(speed) {
@@ -118,15 +157,14 @@ class Star {
 const stars = Array.from({ length: 1000 }, () => new Star());
 const speed = 1;
 const focal_length = 1000;
-let score = 0;
+let exp = 0;
 
-// Define rewards per star
-const rewards = {
-    '#FFD700': 10,      // Gold: 10 points
-    'white': 0.1,       // White: 0.1 points (10 = 1 point)
-    '#99FF66': 1 / 6,   // ~0.1667 points (6 = 1 point)
-    '#66FFFF': 1 / 3,   // ~0.3333 points (3 = 1 point)
-    '#9966FF': 1        // 1 point
+const expRewards = {
+    '#FFD700': 100,  // Gold: 100 exp
+    'white': 1,      // White: 1 exp
+    '#99FF66': 2,    // Green: 2 exp
+    '#66FFFF': 3,    // Cyan: 3 exp
+    '#9966FF': 10    // Purple: 10 exp
 };
 
 // Fixed view matrix with slight downward tilt
@@ -160,28 +198,34 @@ canvas.addEventListener('click', (e) => {
         const { lastX, lastY, lastSize } = star;
         if (clickX >= lastX - lastSize / 2 && clickX <= lastX + lastSize / 2 &&
             clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
-            openDialogue(star);
+            openDialogue(star, clickX, clickY);
             break;
         }
     }
 });
 
-function openDialogue(star) {
-    statement.textContent = star.opStat;
+function openDialogue(star, clickX, clickY) {
+    statement.textContent = star.opStat.text;
     dialogue.style.display = 'block';
+    const dialogueWidth = dialogue.offsetWidth;
+    const dialogueHeight = dialogue.offsetHeight;
+    let left = clickX - dialogueWidth / 2;
+    let top = clickY + 50; // 50 pixels below the click
+    if (left < 0) left = 0;
+    if (left + dialogueWidth > width) left = width - dialogueWidth;
+    if (top + dialogueHeight > height) top = height - dialogueHeight;
+    dialogue.style.left = `${left}px`;
+    dialogue.style.top = `${top}px`;
 
     const onInteract = () => {
-        // Ensure reward exists to prevent NaN
-        if (rewards.hasOwnProperty(star.color)) {
-            score += rewards[star.color];
-        } else {
-            console.error(`No reward defined for color: ${star.color}`);
-            score += 0; // Default to no change if undefined
-        }
+        exp += expRewards[star.color] || 0;
         dialogue.style.display = 'none';
-        star.z = 0; // Remove star after interaction
+        star.z = 0; // Remove star
         agreeBtn.removeEventListener('click', onInteract);
         disagreeBtn.removeEventListener('click', onInteract);
+        if (opStatQueue.length < 10) {
+            loadOpStats();
+        }
     };
 
     agreeBtn.addEventListener('click', onInteract);
@@ -197,14 +241,22 @@ function animate() {
         star.draw();
     });
 
-    // Display "Level" as the integer part of the score
+    // Display level and progress bar
+    const level = Math.floor(exp / 100);
+    const progress = (exp % 100) / 100;
     ctx.save();
     ctx.font = 'bold 24px Arial';
     ctx.fillStyle = '#FFD700';
     ctx.shadowColor = 'black';
     ctx.shadowBlur = 5;
     ctx.textAlign = 'right';
-    ctx.fillText(`Level: ${Math.floor(score)}`, width - 10, 30);
+    ctx.fillText(`Level: ${level}`, width - 10, 30);
+    const barWidth = 100;
+    const barHeight = 15;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(width - 10 - barWidth, 35, barWidth, barHeight);
+    ctx.fillStyle = 'gold';
+    ctx.fillRect(width - 10 - barWidth, 35, barWidth * progress, barHeight);
     ctx.restore();
 
     requestAnimationFrame(animate);

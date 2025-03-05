@@ -1,6 +1,6 @@
 body {
     margin: 0;
-    background: #000; /* Maintain dark theme */
+    background: #000;
     overflow: hidden;
 }
 
@@ -9,10 +9,7 @@ body {
 }
 
 #dialogue {
-    position: fixed;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: absolute;
     background: #333;
     padding: 20px;
     border-radius: 10px;
@@ -37,5 +34,5 @@ body {
 }
 
 #agree:hover, #disagree:hover {
-    background: #0056b3; /* Slightly darker blue on hover */
+    background: #0056b3;
 }
