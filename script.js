@@ -177,6 +177,7 @@ function transpose(m) {
 const agreeSound = new Audio('agree.webm');
 const disagreeSound = new Audio('disagree.webm');
 const levelUpSound = new Audio('lvl-up.webm');
+const catchSound = new Audio('catch.webm'); // Added catch sound
 
 // Star class
 class Star {
@@ -264,11 +265,11 @@ const speed = 1;
 const focal_length = 1000;
 
 const expRewards = {
-    '#FFD700': 100,
+    '#FFD700': 50,
     'white': 1,
     '#99FF66': 2,
-    '#66FFFF': 3,
-    '#9966FF': 10
+    '#66FFFF': 4,
+    '#9966FF': 8
 };
 
 // View control variables
@@ -298,11 +299,11 @@ window.addEventListener('keydown', (e) => {
                 updateUserExp(userExp - 100);
                 break;
             case 'ArrowRight':
-                updateUserExp((Math.floor(userExp / 100) + 1) * 100);
+                updateUserExp((getLevel(userExp) + 1) * 100); // Adjusted for new leveling
                 break;
             case 'ArrowLeft':
-                const currentLevel = Math.floor(userExp / 100);
-                updateUserExp(currentLevel > 0 ? (currentLevel - 1) * 100 : 0);
+                const currentLevel = getLevel(userExp);
+                updateUserExp(currentLevel > 0 ? (currentLevel - 1) * 100 : 0); // Adjusted
                 break;
             case 'Digit1':
                 spawnGoldStar();
@@ -317,11 +318,29 @@ window.addEventListener('keyup', (e) => {
     }
 });
 
+// Leveling system functions
+function getExpForLevel(level) {
+    if (level <= 0) return 0;
+    if (level === 1) return 3;
+    if (level === 2) return 10;
+    if (level === 3) return 20;
+    if (level === 4) return 50;
+    return 50 + 50 * (level - 4);
+}
+
+function getLevel(exp) {
+    if (exp < 3) return 0;
+    if (exp < 10) return 1;
+    if (exp < 20) return 2;
+    if (exp < 50) return 3;
+    return 4 + Math.floor((exp - 50) / 50);
+}
+
 // Update user experience and play level-up sound
 function updateUserExp(newExp) {
-    const previousLevel = Math.floor(userExp / 100);
+    const previousLevel = getLevel(userExp);
     userExp = Math.max(0, newExp);
-    const currentLevel = Math.floor(userExp / 100);
+    const currentLevel = getLevel(userExp);
     if (currentLevel > previousLevel) {
         levelUpSound.play();
     }
@@ -361,11 +380,6 @@ function updateViewMatrix() {
 
 // Click handler with login check commented out
 canvas.addEventListener('click', (e) => {
-    // Login requirement removed but code preserved for future use
-    // if (!currentUser) {
-    //     alert('Please log in to interact with the stars!');
-    //     return;
-    // }
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
@@ -375,6 +389,7 @@ canvas.addEventListener('click', (e) => {
         const { lastX, lastY, lastSize } = star;
         if (clickX >= lastX - lastSize / 2 && clickX <= lastX + lastSize / 2 &&
             clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
+            catchSound.play(); // Play catch sound on click
             openDialogue(star, clickX, clickY);
             break;
         }
@@ -395,7 +410,6 @@ function openDialogue(star, clickX, clickY) {
     dialogue.style.top = `${top}px`;
 
     const onInteract = async (response) => {
-        // Play sound effects based on response
         if (response === 'agree') {
             agreeSound.play();
         } else if (response === 'disagree') {
@@ -428,43 +442,65 @@ function openDialogue(star, clickX, clickY) {
 }
 
 // Animation loop
-// Animation loop
-function animate() {
+let startTime = null;
+let nextGoldSpawnTime = 45; // First gold star at 45 seconds
+
+function animate(timestamp) {
+    if (!startTime) startTime = timestamp;
+    const elapsed = (timestamp - startTime) / 1000;
+
+    // Gold star spawning
+    if (elapsed >= nextGoldSpawnTime) {
+        spawnGoldStar();
+        nextGoldSpawnTime += 60; // Next spawn in 60 seconds
+    }
+
     ctx.clearRect(0, 0, width, height);
 
     // Update streak effect
     if (keysPressed.Backquote) {
-        streakFactor = 1;
+        streakFactor = 2;
     } else {
         streakFactor = Math.max(0, streakFactor - 0.05);
     }
 
     // Adjust view with WASD
-    if (keysPressed.KeyW) pitch -= rotationSpeed;
-    if (keysPressed.KeyS) pitch += rotationSpeed;
+    if (keysPressed.KeyS) pitch -= rotationSpeed;
+    if (keysPressed.KeyW) pitch += rotationSpeed;
     if (keysPressed.KeyA) yaw -= rotationSpeed;
     if (keysPressed.KeyD) yaw += rotationSpeed;
 
     // Limit pitch and yaw to a small range
-    const minPitch = -0.48 - 0.3;  // 
-    const maxPitch = -0.48 + 0.3;  // 
-    const minYaw = -0.3;           // 
-    const maxYaw = 0.3;            // 
+    const minPitch = -0.48 - 0.3;
+    const maxPitch = -0.48 + 0.3;
+    const minYaw = -0.3;
+    const maxYaw = 0.3;
     pitch = Math.max(minPitch, Math.min(maxPitch, pitch));
     yaw = Math.max(minYaw, Math.min(maxYaw, yaw));
 
     updateViewMatrix();
 
-    stars.forEach(star => {
-        star.update(speed);
-        star.draw();
-    });
+    // Update all stars
+    stars.forEach(star => star.update(speed));
+
+    // Sort stars by z-position (ascending) for layering
+    stars.sort((a, b) => b.z - a.z); // Smaller z (closer) drawn last
+
+    // Draw all stars
+    stars.forEach(star => star.draw());
 
     // Display level and progress bar
-    const level = Math.floor(userExp / 100);
-    const progress = (userExp % 100) / 100;
+    const level = getLevel(userExp);
+    let progress;
+    if (level === 0) {
+        progress = userExp / 3;
+    } else {
+        const expForCurrentLevel = getExpForLevel(level);
+        const expForNextLevel = getExpForLevel(level + 1);
+        progress = (userExp - expForCurrentLevel) / (expForNextLevel - expForCurrentLevel);
+    }
     ctx.save();
-    ctx.font = 'bold 24px Arial';
+    ctx.font = 'bold 34px Arial';
     ctx.fillStyle = '#FFD700';
     ctx.shadowColor = 'black';
     ctx.shadowBlur = 5;
