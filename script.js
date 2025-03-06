@@ -1,7 +1,4 @@
-// Firebase initialization
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
-
+// Initialize Firebase
 const firebaseConfig = {
     apiKey: "AIzaSyBXaY6hn6NDJI6WEy1mvtGRXl6V5_W7HJs",
     authDomain: "sd-opinion-statements.firebaseapp.com",
@@ -11,17 +8,111 @@ const firebaseConfig = {
     appId: "1:702007524321:web:9b25faa3203a3b621af0a0"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const auth = firebase.auth();
+
+// Get UI elements
+const loginButton = document.getElementById('login-button');
+const logoutButton = document.getElementById('logout-button');
+const userInfo = document.getElementById('user-info');
+const userName = document.getElementById('user-name');
+const firebaseuiContainer = document.getElementById('firebaseui-auth-container');
+
+// User state
+let currentUser = null;
+let userExp = 0;
+
+// Firebase UI configuration
+const uiConfig = {
+    signInOptions: [
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID,    // Google login
+        firebase.auth.TwitterAuthProvider.PROVIDER_ID,   // Twitter login
+        firebase.auth.EmailAuthProvider.PROVIDER_ID      // Email/Password login
+    ],
+    callbacks: {
+        signInSuccessWithAuthResult: () => false // Stay on the same page after login
+    }
+};
+
+// Function to initialize Firebase UI with a retry limit
+let retryCount = 0;
+const MAX_RETRIES = 5;
+
+function initFirebaseUI() {
+    if (typeof firebaseui === 'undefined') {
+        if (retryCount < MAX_RETRIES) {
+            console.error('Firebase UI not loaded yet. Retrying in 1 second...');
+            retryCount++;
+            setTimeout(initFirebaseUI, 1000);
+        } else {
+            console.error('Failed to load Firebase UI after maximum retries.');
+        }
+        return;
+    }
+    const ui = new firebaseui.auth.AuthUI(auth);
+    ui.start('#firebaseui-auth-container', uiConfig);
+}
+
+// Show login options
+loginButton.addEventListener('click', () => {
+    firebaseuiContainer.style.display = 'block';
+    initFirebaseUI();
+});
+
+// Log out
+logoutButton.addEventListener('click', () => {
+    auth.signOut().catch((error) => {
+        console.error('Logout failed:', error);
+    });
+});
+
+// Track login state and load user data
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        currentUser = user;
+        userName.textContent = user.displayName || user.email;
+        userInfo.style.display = 'block';
+        loginButton.style.display = 'none';
+        firebaseuiContainer.style.display = 'none';
+        loadUserData(user.uid);
+    } else {
+        currentUser = null;
+        userInfo.style.display = 'none';
+        loginButton.style.display = 'block';
+        firebaseuiContainer.style.display = 'none';
+        userExp = 0;
+    }
+});
+
+// Load user data from Firestore
+async function loadUserData(uid) {
+    try {
+        const userDocRef = db.collection('users').doc(uid);
+        const userDoc = await userDocRef.get();
+        if (userDoc.exists) {
+            userExp = userDoc.data().exp || 0;
+        } else {
+            await userDocRef.set({ exp: 0 });
+            userExp = 0;
+        }
+    } catch (error) {
+        console.error('Error loading user data:', error);
+    }
+}
 
 // Op-Stat queue management
 let opStatQueue = [];
 
 async function loadOpStats() {
-    const querySnapshot = await getDocs(collection(db, "op-stats"));
-    const allOpStats = querySnapshot.docs.map(doc => doc.data());
-    const shuffled = shuffleArray(allOpStats);
-    opStatQueue = opStatQueue.concat(shuffled.slice(0, 20));
+    try {
+        const querySnapshot = await db.collection("op-stats").get();
+        const allOpStats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const shuffled = shuffleArray(allOpStats);
+        opStatQueue = opStatQueue.concat(shuffled.slice(0, 20));
+    } catch (error) {
+        console.error('Error loading op-stats:', error);
+    }
 }
 
 function shuffleArray(array) {
@@ -32,9 +123,9 @@ function shuffleArray(array) {
     return array;
 }
 
-// Load initial op-stats when the game starts
 loadOpStats();
 
+// Canvas setup
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 let width, height;
@@ -118,7 +209,7 @@ class Star {
         if (opStatQueue.length > 0) {
             this.opStat = opStatQueue.shift();
         } else {
-            this.opStat = { text: "Loading...", type: "placeholder" };
+            this.opStat = { text: "Loading...", id: "placeholder" };
             loadOpStats().then(() => {
                 this.opStat = opStatQueue.shift() || this.opStat;
             });
@@ -157,7 +248,6 @@ class Star {
 const stars = Array.from({ length: 1000 }, () => new Star());
 const speed = 1;
 const focal_length = 1000;
-let exp = 0;
 
 const expRewards = {
     '#FFD700': 100,  // Gold: 100 exp
@@ -167,7 +257,7 @@ const expRewards = {
     '#9966FF': 10    // Purple: 10 exp
 };
 
-// Fixed view matrix with slight downward tilt
+// Fixed view matrix
 const pitch = -0.48;
 const yaw = 0;
 const cosPitch = Math.cos(pitch);
@@ -189,6 +279,10 @@ const viewMatrix = transpose(R);
 
 // Click handler
 canvas.addEventListener('click', (e) => {
+    if (!currentUser) {
+        alert('Please log in to interact with the stars!');
+        return;
+    }
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
@@ -210,26 +304,38 @@ function openDialogue(star, clickX, clickY) {
     const dialogueWidth = dialogue.offsetWidth;
     const dialogueHeight = dialogue.offsetHeight;
     let left = clickX - dialogueWidth / 2;
-    let top = clickY - 50; // 50 pixels above the click
+    let top = clickY + 50;
     if (left < 0) left = 0;
     if (left + dialogueWidth > width) left = width - dialogueWidth;
     if (top + dialogueHeight > height) top = height - dialogueHeight;
     dialogue.style.left = `${left}px`;
     dialogue.style.top = `${top}px`;
 
-    const onInteract = () => {
-        exp += expRewards[star.color] || 0;
+    const onInteract = async (response) => {
+        const reward = expRewards[star.color] || 0;
+        userExp += reward;
+        if (currentUser) {
+            try {
+                const userDocRef = db.collection('users').doc(currentUser.uid);
+                await userDocRef.update({ exp: userExp });
+                await db.collection(`users/${currentUser.uid}/responses`).add({
+                    opStatId: star.opStat.id,
+                    response: response,
+                    timestamp: new Date()
+                });
+            } catch (error) {
+                console.error('Error updating user data:', error);
+            }
+        }
         dialogue.style.display = 'none';
         star.z = 0; // Remove star
-        agreeBtn.removeEventListener('click', onInteract);
-        disagreeBtn.removeEventListener('click', onInteract);
         if (opStatQueue.length < 10) {
             loadOpStats();
         }
     };
 
-    agreeBtn.addEventListener('click', onInteract);
-    disagreeBtn.addEventListener('click', onInteract);
+    agreeBtn.onclick = () => onInteract('agree');
+    disagreeBtn.onclick = () => onInteract('disagree');
 }
 
 // Animation loop
@@ -242,8 +348,8 @@ function animate() {
     });
 
     // Display level and progress bar
-    const level = Math.floor(exp / 100);
-    const progress = (exp % 100) / 100;
+    const level = Math.floor(userExp / 100);
+    const progress = (userExp % 100) / 100;
     ctx.save();
     ctx.font = 'bold 24px Arial';
     ctx.fillStyle = '#FFD700';

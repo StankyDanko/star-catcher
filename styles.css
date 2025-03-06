@@ -23,7 +23,7 @@ body {
     margin-bottom: 10px;
 }
 
-#agree, #disagree {
+#agree {
     background: #007BFF;
     color: white;
     border: none;
@@ -33,6 +33,82 @@ body {
     border-radius: 5px;
 }
 
-#agree:hover, #disagree:hover {
+#agree:hover {
     background: #0056b3;
+}
+
+#disagree {
+    background: #ff0040;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    margin: 0 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+#disagree:hover {
+    background: #b30000;
+}
+
+#login-container {
+    position: absolute;
+    top: 55px; /* Below progress bar (35px + 15px + 5px padding) */
+    right: 10px;
+    width: 100px; /* Matches progress bar width */
+    z-index: 10;
+}
+
+#login-button {
+    width: 100%; /* Fills the container */
+    box-sizing: border-box; /* Includes padding in width */
+    background: #007BFF;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+#logout-button {
+    width: 100%;
+    box-sizing: border-box;
+    background: #007BFF;
+    color: white;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+#login-button:hover, #logout-button:hover {
+    background: #0056b3;
+}
+
+#user-name {
+    color: white;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+/* Add styling for Firebase UI container */
+#firebaseui-auth-container {
+    position: absolute;
+    top: 85px; /* Below login button (55px + ~30px button height) */
+    right: 10px;
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 11;
+}
+
+#user-info {
+    position: absolute;
+    top: 55px; /* Same position as login button */
+    right: 10px;
+    width: 100px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
