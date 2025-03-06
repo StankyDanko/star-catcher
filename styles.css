@@ -16,6 +16,10 @@ body {
     text-align: center;
     max-width: 300px;
     border: 2px solid #9900ff50;
+    user-select: none;          /* Standard property */
+    -webkit-user-select: none;  /* For Safari */
+    -moz-user-select: none;     /* For Firefox */
+    -ms-user-select: none;      /* For Internet Explorer/Edge */
 }
 
 #statement {
@@ -26,6 +30,10 @@ body {
     font-weight: bold;
     font-family: Arial, sans-serif;
     font-size: 22px;
+    user-select: none;          /* Standard property */
+    -webkit-user-select: none;  /* For Safari */
+    -moz-user-select: none;     /* For Firefox */
+    -ms-user-select: none;      /* For Internet Explorer/Edge */
 }
 
 #agree, #disagree {
@@ -38,6 +46,10 @@ body {
     margin: 0 20px;
     cursor: pointer;
     border-radius: 10px;
+    user-select: none;          /* Standard property */
+    -webkit-user-select: none;  /* For Safari */
+    -moz-user-select: none;     /* For Firefox */
+    -ms-user-select: none;      /* For Internet Explorer/Edge */
 }
 
 #agree:hover, #disagree:hover {
@@ -51,6 +63,31 @@ body {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    user-select: none;          /* Standard property */
+    -webkit-user-select: none;  /* For Safari */
+    -moz-user-select: none;     /* For Firefox */
+    -ms-user-select: none;      /* For Internet Explorer/Edge */
+}
+
+#sd-contact {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    user-select: none;          /* Standard property */
+    -webkit-user-select: none;  /* For Safari */
+    -moz-user-select: none;     /* For Firefox */
+    -ms-user-select: none;      /* For Internet Explorer/Edge */
+}
+
+.contact-box {
+    background: #0f0f0fef; /* Dark semi-transparent background */
+    padding: 5px;    /* Padding for spacing around the image */
+    border-radius: 15px;   /* Rounded corners */
+    text-align: center;    /* Centers the image horizontally */
+    border: 2px solid #9900ff50; /* Subtle glowing border */
 }
 
 #stat-box {
