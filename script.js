@@ -14,10 +14,13 @@ const auth = firebase.auth();
 
 // Get UI elements
 const loginButton = document.getElementById('login-button');
+const loginContainer = document.getElementById('login-container');
 const logoutButton = document.getElementById('logout-button');
 const userInfo = document.getElementById('user-info');
 const userName = document.getElementById('user-name');
 const firebaseuiContainer = document.getElementById('firebaseui-auth-container');
+const levelText = document.getElementById('level-text');
+const progressFill = document.getElementById('progress-fill');
 
 // User state
 let currentUser = null;
@@ -73,13 +76,12 @@ auth.onAuthStateChanged((user) => {
         currentUser = user;
         userName.textContent = user.displayName || user.email;
         userInfo.style.display = 'block';
-        loginButton.style.display = 'none';
-        firebaseuiContainer.style.display = 'none';
+        loginContainer.style.display = 'none';
         loadUserData(user.uid);
     } else {
         currentUser = null;
         userInfo.style.display = 'none';
-        loginButton.style.display = 'block';
+        loginContainer.style.display = 'block';
         firebaseuiContainer.style.display = 'none';
         userExp = 0;
     }
@@ -177,7 +179,7 @@ function transpose(m) {
 const agreeSound = new Audio('agree.webm');
 const disagreeSound = new Audio('disagree.webm');
 const levelUpSound = new Audio('lvl-up.webm');
-const catchSound = new Audio('catch.webm'); // Added catch sound
+const catchSound = new Audio('catch.webm');
 
 // Star class
 class Star {
@@ -240,15 +242,6 @@ class Star {
             const x = rotated_pos[0] * scale + width / 2;
             const y = rotated_pos[1] * scale + height / 2;
             let size = Math.max(1, scale * this.baseSize);
-            if (streakFactor > 0 && this.lastX !== undefined && this.lastY !== undefined) {
-                ctx.beginPath();
-                ctx.moveTo(this.lastX, this.lastY);
-                ctx.lineTo(x, y);
-                ctx.strokeStyle = `rgba(255, 255, 255, ${streakFactor * 0.5})`;
-                ctx.lineWidth = size / 2;
-                ctx.stroke();
-                size *= (1 + streakFactor); // Glow effect
-            }
             ctx.beginPath();
             ctx.fillStyle = this.color;
             ctx.fillRect(x - size / 2, y - size / 2, size, size);
@@ -260,8 +253,11 @@ class Star {
 }
 
 // Game state
-const stars = Array.from({ length: 1000 }, () => new Star());
-const speed = 1;
+const stars = Array.from({ length: 500 }, () => new Star());
+const baseSpeed = 1.2;
+const speedFactor = 1.2;
+let speedLevel = 0;
+let speed = baseSpeed * Math.pow(speedFactor, speedLevel);
 const focal_length = 1000;
 
 const expRewards = {
@@ -275,14 +271,12 @@ const expRewards = {
 // View control variables
 let pitch = -0.48;
 let yaw = 0;
-const rotationSpeed = 0.01;
-let streakFactor = 0;
+const rotationSpeed = 0.004;
 const keysPressed = {
     KeyW: false,
     KeyA: false,
     KeyS: false,
-    KeyD: false,
-    Backquote: false
+    KeyD: false
 };
 
 // Event listeners for keyboard controls
@@ -293,20 +287,16 @@ window.addEventListener('keydown', (e) => {
     if (!e.repeat) { // Prevent continuous triggering when held
         switch (e.code) {
             case 'ArrowUp':
-                updateUserExp(userExp + 100);
+                if (speedLevel < 3) {
+                    speedLevel++;
+                    speed = baseSpeed * Math.pow(speedFactor, speedLevel);
+                }
                 break;
             case 'ArrowDown':
-                updateUserExp(userExp - 100);
-                break;
-            case 'ArrowRight':
-                updateUserExp((getLevel(userExp) + 1) * 100); // Adjusted for new leveling
-                break;
-            case 'ArrowLeft':
-                const currentLevel = getLevel(userExp);
-                updateUserExp(currentLevel > 0 ? (currentLevel - 1) * 100 : 0); // Adjusted
-                break;
-            case 'Digit1':
-                spawnGoldStar();
+                if (speedLevel > -3) {
+                    speedLevel--;
+                    speed = baseSpeed * Math.pow(speedFactor, speedLevel);
+                }
                 break;
         }
     }
@@ -346,17 +336,6 @@ function updateUserExp(newExp) {
     }
 }
 
-// Spawn a gold star
-function spawnGoldStar() {
-    if (stars.length >= 1000) {
-        stars.shift(); // Maintain star count
-    }
-    const goldStar = new Star();
-    goldStar.color = '#FFD700';
-    goldStar.assignOpStat();
-    stars.push(goldStar);
-}
-
 // Update view matrix based on pitch and yaw
 let viewMatrix;
 function updateViewMatrix() {
@@ -378,7 +357,7 @@ function updateViewMatrix() {
     viewMatrix = transpose(R);
 }
 
-// Click handler with login check commented out
+// Click handler
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -390,14 +369,16 @@ canvas.addEventListener('click', (e) => {
         if (clickX >= lastX - lastSize / 2 && clickX <= lastX + lastSize / 2 &&
             clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
             catchSound.play(); // Play catch sound on click
-            openDialogue(star, clickX, clickY);
+            const reward = expRewards[star.color] || 0;
+            stars.splice(i, 1); // Remove the star immediately
+            openDialogue(star.opStat, reward, clickX, clickY);
             break;
         }
     }
 });
 
-function openDialogue(star, clickX, clickY) {
-    statement.textContent = star.opStat.text;
+function openDialogue(opStat, reward, clickX, clickY) {
+    statement.textContent = opStat.text;
     dialogue.style.display = 'block';
     const dialogueWidth = dialogue.offsetWidth;
     const dialogueHeight = dialogue.offsetHeight;
@@ -415,14 +396,13 @@ function openDialogue(star, clickX, clickY) {
         } else if (response === 'disagree') {
             disagreeSound.play();
         }
-        const reward = expRewards[star.color] || 0;
-        updateUserExp(userExp + reward);
+        updateUserExp(userExp + reward); // Update points here
         if (currentUser) {
             try {
                 const userDocRef = db.collection('users').doc(currentUser.uid);
                 await userDocRef.update({ exp: userExp });
                 await db.collection(`users/${currentUser.uid}/responses`).add({
-                    opStatId: star.opStat.id,
+                    opStatId: opStat.id,
                     response: response,
                     timestamp: new Date()
                 });
@@ -431,7 +411,6 @@ function openDialogue(star, clickX, clickY) {
             }
         }
         dialogue.style.display = 'none';
-        star.z = 0; // Remove star
         if (opStatQueue.length < 10) {
             loadOpStats();
         }
@@ -451,18 +430,15 @@ function animate(timestamp) {
 
     // Gold star spawning
     if (elapsed >= nextGoldSpawnTime) {
-        spawnGoldStar();
+        const goldStar = new Star();
+        goldStar.color = '#FFD700';
+        goldStar.assignOpStat();
+        if (stars.length >= 1000) stars.shift();
+        stars.push(goldStar);
         nextGoldSpawnTime += 60; // Next spawn in 60 seconds
     }
 
     ctx.clearRect(0, 0, width, height);
-
-    // Update streak effect
-    if (keysPressed.Backquote) {
-        streakFactor = 2;
-    } else {
-        streakFactor = Math.max(0, streakFactor - 0.05);
-    }
 
     // Adjust view with WASD
     if (keysPressed.KeyS) pitch -= rotationSpeed;
@@ -484,12 +460,12 @@ function animate(timestamp) {
     stars.forEach(star => star.update(speed));
 
     // Sort stars by z-position (ascending) for layering
-    stars.sort((a, b) => b.z - a.z); // Smaller z (closer) drawn last
+    stars.sort((a, b) => b.z - a.z); // Larger stars appear 'on top' for the viewer
 
     // Draw all stars
     stars.forEach(star => star.draw());
 
-    // Display level and progress bar
+    // Calculate level and progress
     const level = getLevel(userExp);
     let progress;
     if (level === 0) {
@@ -499,20 +475,10 @@ function animate(timestamp) {
         const expForNextLevel = getExpForLevel(level + 1);
         progress = (userExp - expForCurrentLevel) / (expForNextLevel - expForCurrentLevel);
     }
-    ctx.save();
-    ctx.font = 'bold 34px Arial';
-    ctx.fillStyle = '#FFD700';
-    ctx.shadowColor = 'black';
-    ctx.shadowBlur = 5;
-    ctx.textAlign = 'right';
-    ctx.fillText(`Level: ${level}`, width - 10, 30);
-    const barWidth = 100;
-    const barHeight = 15;
-    ctx.fillStyle = 'black';
-    ctx.fillRect(width - 10 - barWidth, 35, barWidth, barHeight);
-    ctx.fillStyle = 'gold';
-    ctx.fillRect(width - 10 - barWidth, 35, barWidth * progress, barHeight);
-    ctx.restore();
+
+    // Update stat-box
+    levelText.textContent = `Level: ${level}`;
+    progressFill.style.width = `${progress * 100}%`;
 
     requestAnimationFrame(animate);
 }

@@ -14,22 +14,21 @@ body {
     padding: 20px 30px;
     border-radius: 15px;
     text-align: center;
-    max-width: 300px; /* Added: Limits width, text wraps naturally */
+    max-width: 300px;
     border: 2px solid #9900ff50;
 }
 
 #statement {
     margin-bottom: 30px;
     margin-top: 0px;
-    text-align: center; /* Added: Left-aligns statement text */
+    text-align: center;
     color: white;
     font-weight: bold;
     font-family: Arial, sans-serif;
     font-size: 22px;
-
 }
 
-#agree {
+#agree, #disagree {
     background: #9900ff;
     color: white;
     font-size: 18px;
@@ -41,49 +40,68 @@ body {
     border-radius: 10px;
 }
 
-#agree:hover {
+#agree:hover, #disagree:hover {
     background: #5a0096;
 }
 
-#disagree {
-    background: #9900ff;
-    color: white;
-    font-size: 18px;
-    font-weight: lighter;
-    border: none;
-    padding: 10px 15px;
-    margin: 0 20px;
-    cursor: pointer;
-    border-radius: 10px;
+#game-info {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
 }
 
-#disagree:hover {
-    background: #5a0096;
+#stat-box {
+    background: #0f0f0fef;
+    padding: 10px 20px;
+    border-radius: 15px;
+    text-align: center;
+    border: 2px solid #9900ff50;
+    margin-bottom: 10px;
+}
+
+#level-text {
+    color: gold;
+    font-weight: bold;
+    font-family: Arial, sans-serif;
+    font-size: 24px;
+    margin: 0;
+}
+
+#progress-bar {
+    width: 100px;
+    height: 10px;
+    background: black;
+    border-radius: 5px;
+    margin-top: 5px;
+}
+
+#progress-fill {
+    height: 100%;
+    background: gold;
+    border-radius: 5px;
+    width: 0%;
 }
 
 #login-container {
-    position: absolute;
-    top: 55px;
-    right: 10px;
     width: 100px;
     z-index: 10;
 }
 
-#login-button {
+#user-info {
+    width: 100px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#login-button, #logout-button {
     width: 100%;
     box-sizing: border-box;
     background: #9900ff6b;
-    color: white;
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-    border-radius: 5px;
-}
-
-#logout-button {
-    width: 100%;
-    box-sizing: border-box;
-    background: #9900FF6b;
     color: white;
     border: none;
     padding: 10px;
@@ -109,15 +127,4 @@ body {
     padding: 10px;
     border-radius: 5px;
     z-index: 11;
-}
-
-#user-info {
-    position: absolute;
-    top: 55px;
-    right: 10px;
-    width: 100px;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
 }
