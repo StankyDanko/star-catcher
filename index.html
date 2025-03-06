@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Danko's Star Catcher</title>
     <link rel="stylesheet" href="styles.css">
-    <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebaseui/6.0.1/firebaseui.css" />
+    <script src="https://www.gstatic.com/firebasejs/ui/6.1.0/firebase-ui-auth.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.1.0/firebase-ui-auth.css" />
 </head>
 <body>
     <canvas id="canvas"></canvas>
@@ -20,8 +21,12 @@
             <div id="progress-bar">
                 <div id="progress-fill"></div>
             </div>
+            <p class="contact-text">⭐ Can you find the GOLD star ⭐</p>
         </div>
-        <p class="contact-text">⭐ catch GOLD STARS for more EXP ⭐</p>
+        <div id="login-container">
+            <button id="login-button">Log In</button>
+            <div id="firebaseui-auth-container" style="display: none;"></div>
+        </div>
         <div id="user-info" style="display: none;">
             <span id="user-name"></span>
             <button id="logout-button">Log Out</button>
@@ -32,16 +37,12 @@
             <a href="https://x.com/StankyDanko">
                 <img src="SD_chillin.png" alt="See what Danko is up to on X">
             </a>
-            <div id="login-container">
-                <button id="login-button">Log In</button>
-                <div id="firebaseui-auth-container" style="display: none;"></div>
-            </div>
         </div>
     </div>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebaseui/6.0.1/firebaseui.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/ui/6.1.0/firebase-ui-auth.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

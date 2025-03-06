@@ -90,24 +90,31 @@ body {
     text-align: center;    /* Centers the image horizontally */
     border: 2px solid #99ff002c; /* Subtle glowing border */
     box-shadow: 0 0 15px #99ff0062; /* glowing effect */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    max-width: 400;
+    width: auto;
 }
 
 .contact-text {
     color: rgba(255, 217, 0, 0.603);
     font-size: 18px;
     font-weight: lighter;
-    margin-top: 0px; /* Optional: adds spacing above the text */
-    margin-right: 5px;
+    margin-top: 20px; /* Optional: adds spacing above the text */
+    display: flex; /* Use flex to align children */
+    flex-direction: column; /* Stack children vertically */
+    align-items: center; /* Center align items */
 }
 
 #stat-box {
     background: #0f0f0fef;
-    padding: 10px 20px;
+    padding: 5px 10px;
     border-radius: 15px;
     text-align: center;
     border: 2px solid #9900ff50;
     box-shadow: 0 0 10px #9900ffb9;
-    margin-bottom: 10px;
     width: 100%;
 }
 
@@ -116,7 +123,7 @@ body {
     font-weight: bold;
     font-family: Arial, sans-serif;
     font-size: 30px;
-    margin: 0;
+    margin-top: 5px;
 }
 
 #progress-bar {
@@ -124,7 +131,7 @@ body {
     height: 10px;
     background: black;
     border-radius: 5px;
-    margin-top: 5px;
+    margin-top: 20px;
 }
 
 #progress-fill {
@@ -135,11 +142,15 @@ body {
 }
 
 #login-container {
-    width: 80px;
+    width: auto; /* Remove fixed width to allow expansion */
+    padding: 10px;
     z-index: 10;
     right: 10px;
     top: 10px;
-
+    display: flex; /* Use flex to align children */
+    flex-direction: column; /* Stack children vertically */
+    align-items: center; /* Center align items */
+    transition: all 0.3s ease; /* Smooth transition for size changes */
 }
 
 #user-info {
@@ -151,17 +162,15 @@ body {
 }
 
 #login-button, #logout-button {
-    width: 80%;
-    right: 10px;
+    width: 100%;
     box-sizing: border-box;
-    background: #9900ff6b;
+    background: #9900ff46;
     color: white;
     border: none;
     padding: 10px;
-    margin-top: 10px;
-    margin-bottom: 5px;
+    margin: 5px;
     cursor: pointer;
-    border-radius: 10px;
+    border-radius: 5px;
 }
 
 #login-button:hover, #logout-button:hover {
@@ -177,8 +186,14 @@ body {
 #firebaseui-auth-container {
     top: 85px;
     right: 10px;
-    background: rgba(235, 183, 248, 0.37);
-    padding: 10px;
-    border-radius: 5px;
+    background: #0f0f0fef;
+    padding: 20px; /* Increased padding for better spacing */
+    border-radius: 10px;
     z-index: 11;
+    width: auto; /* Allow dynamic width */
+    max-width: 400px; /* Match contact-box max width for consistency */
+    min-width: 250px; /* Minimum width to ensure readability */
+    box-sizing: border-box; /* Include padding in width calculations */
+    display: none; /* Ensure it starts hidden */
+    transition: all 0.3s ease; /* Smooth transition when shown */
 }

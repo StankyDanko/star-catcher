@@ -105,15 +105,33 @@ async function loadUserData(uid) {
 
 // Op-Stat queue management
 let opStatQueue = [];
+let isLoadingOpStats = false;
+
+function generateRandomId() {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 20; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
 
 async function loadOpStats() {
+    if (isLoadingOpStats) return;
+    isLoadingOpStats = true;
     try {
-        const querySnapshot = await db.collection("op-stats").get();
-        const allOpStats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        const shuffled = shuffleArray(allOpStats);
-        opStatQueue = opStatQueue.concat(shuffled.slice(0, 20));
+        const randomId = generateRandomId();
+        const querySnapshot = await db.collection("op-stats")
+            .where('__name__', '>=', randomId)
+            .orderBy('__name__')
+            .limit(10) // Changed from 50 to 10
+            .get();
+        let fetchedOpStats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        opStatQueue = opStatQueue.concat(shuffleArray(fetchedOpStats));
     } catch (error) {
         console.error('Error loading op-stats:', error);
+    } finally {
+        isLoadingOpStats = false;
     }
 }
 
@@ -125,6 +143,7 @@ function shuffleArray(array) {
     return array;
 }
 
+// Initial load
 loadOpStats();
 
 // Canvas setup
@@ -188,13 +207,14 @@ class Star {
         this.y = Math.random() * 1000 - 500;
         this.z = Math.random() * 1000;
         this.baseSize = Math.random() * 6 + 3;
-        this.resetColorAndOpStat();
+        this.resetColor(); // Only set color initially
+        this.opStat = null; // No op-stat until clicked
         this.lastX = undefined;
         this.lastY = undefined;
         this.lastSize = 0;
     }
 
-    resetColorAndOpStat() {
+    resetColor() {
         const r = Math.random();
         if (r < 1 / 10800) {
             this.color = '#FFD700'; // Gold, rare
@@ -210,7 +230,6 @@ class Star {
                 this.color = '#9966FF'; // Purple
             }
         }
-        this.assignOpStat();
     }
 
     assignOpStat() {
@@ -218,9 +237,13 @@ class Star {
             this.opStat = opStatQueue.shift();
         } else {
             this.opStat = { text: "Loading...", id: "placeholder" };
-            loadOpStats().then(() => {
-                this.opStat = opStatQueue.shift() || this.opStat;
-            });
+            if (!isLoadingOpStats) {
+                loadOpStats().then(() => {
+                    if (opStatQueue.length > 0) {
+                        this.opStat = opStatQueue.shift();
+                    }
+                });
+            }
         }
     }
 
@@ -230,7 +253,8 @@ class Star {
             this.x = Math.random() * 1000 - 500;
             this.y = Math.random() * 1000 - 500;
             this.z = 1000;
-            this.resetColorAndOpStat();
+            this.resetColor(); // Reset color only
+            this.opStat = null; // Clear op-stat on reset
         }
     }
 
@@ -284,7 +308,7 @@ window.addEventListener('keydown', (e) => {
     if (e.code in keysPressed) {
         keysPressed[e.code] = true;
     }
-    if (!e.repeat) { // Prevent continuous triggering when held
+    if (!e.repeat) {
         switch (e.code) {
             case 'ArrowUp':
                 if (speedLevel < 3) {
@@ -368,9 +392,10 @@ canvas.addEventListener('click', (e) => {
         const { lastX, lastY, lastSize } = star;
         if (clickX >= lastX - lastSize / 2 && clickX <= lastX + lastSize / 2 &&
             clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
-            catchSound.play(); // Play catch sound on click
+            catchSound.play();
+            star.assignOpStat(); // Assign op-stat only on click
             const reward = expRewards[star.color] || 0;
-            stars.splice(i, 1); // Remove the star immediately
+            stars.splice(i, 1);
             openDialogue(star.opStat, reward, clickX, clickY);
             break;
         }
@@ -396,7 +421,7 @@ function openDialogue(opStat, reward, clickX, clickY) {
         } else if (response === 'disagree') {
             disagreeSound.play();
         }
-        updateUserExp(userExp + reward); // Update points here
+        updateUserExp(userExp + reward);
         if (currentUser) {
             try {
                 const userDocRef = db.collection('users').doc(currentUser.uid);
@@ -411,9 +436,7 @@ function openDialogue(opStat, reward, clickX, clickY) {
             }
         }
         dialogue.style.display = 'none';
-        if (opStatQueue.length < 10) {
-            loadOpStats();
-        }
+        // Removed queue check here
     };
 
     agreeBtn.onclick = () => onInteract('agree');
@@ -422,7 +445,7 @@ function openDialogue(opStat, reward, clickX, clickY) {
 
 // Animation loop
 let startTime = null;
-let nextGoldSpawnTime = 45; // First gold star at 45 seconds
+let nextGoldSpawnTime = 45;
 
 function animate(timestamp) {
     if (!startTime) startTime = timestamp;
@@ -432,10 +455,10 @@ function animate(timestamp) {
     if (elapsed >= nextGoldSpawnTime) {
         const goldStar = new Star();
         goldStar.color = '#FFD700';
-        goldStar.assignOpStat();
+        // No op-stat assigned here; assigned on click
         if (stars.length >= 1000) stars.shift();
         stars.push(goldStar);
-        nextGoldSpawnTime += 60; // Next spawn in 60 seconds
+        nextGoldSpawnTime += 60;
     }
 
     ctx.clearRect(0, 0, width, height);
@@ -446,7 +469,7 @@ function animate(timestamp) {
     if (keysPressed.KeyA) yaw -= rotationSpeed;
     if (keysPressed.KeyD) yaw += rotationSpeed;
 
-    // Limit pitch and yaw to a small range
+    // Limit pitch and yaw
     const minPitch = -0.48 - 0.3;
     const maxPitch = -0.48 + 0.3;
     const minYaw = -0.3;
@@ -459,8 +482,8 @@ function animate(timestamp) {
     // Update all stars
     stars.forEach(star => star.update(speed));
 
-    // Sort stars by z-position (ascending) for layering
-    stars.sort((a, b) => b.z - a.z); // Larger stars appear 'on top' for the viewer
+    // Sort stars by z-position
+    stars.sort((a, b) => b.z - a.z);
 
     // Draw all stars
     stars.forEach(star => star.draw());
@@ -479,6 +502,11 @@ function animate(timestamp) {
     // Update stat-box
     levelText.textContent = `Level: ${level}`;
     progressFill.style.width = `${progress * 100}%`;
+
+    // Refill op-stat queue if low
+    if (opStatQueue.length < 3 && !isLoadingOpStats) {
+        loadOpStats();
+    }
 
     requestAnimationFrame(animate);
 }
