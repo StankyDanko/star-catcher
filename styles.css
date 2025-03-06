@@ -53,15 +53,15 @@ body {
 
 #login-container {
     position: absolute;
-    top: 55px; /* Below progress bar (35px + 15px + 5px padding) */
+    top: 55px;
     right: 10px;
-    width: 100px; /* Matches progress bar width */
+    width: 100px;
     z-index: 10;
 }
 
 #login-button {
-    width: 100%; /* Fills the container */
-    box-sizing: border-box; /* Includes padding in width */
+    width: 100%;
+    box-sizing: border-box;
     background: #007BFF;
     color: white;
     border: none;
@@ -91,10 +91,9 @@ body {
     margin-bottom: 5px;
 }
 
-/* Add styling for Firebase UI container */
 #firebaseui-auth-container {
     position: absolute;
-    top: 85px; /* Below login button (55px + ~30px button height) */
+    top: 85px;
     right: 10px;
     background: white;
     padding: 10px;
@@ -104,7 +103,7 @@ body {
 
 #user-info {
     position: absolute;
-    top: 55px; /* Same position as login button */
+    top: 55px;
     right: 10px;
     width: 100px;
     z-index: 10;

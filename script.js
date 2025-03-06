@@ -26,16 +26,16 @@ let userExp = 0;
 // Firebase UI configuration
 const uiConfig = {
     signInOptions: [
-        firebase.auth.GoogleAuthProvider.PROVIDER_ID,    // Google login
-        firebase.auth.TwitterAuthProvider.PROVIDER_ID,   // Twitter login
-        firebase.auth.EmailAuthProvider.PROVIDER_ID      // Email/Password login
+        firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+        firebase.auth.TwitterAuthProvider.PROVIDER_ID,
+        firebase.auth.EmailAuthProvider.PROVIDER_ID
     ],
     callbacks: {
-        signInSuccessWithAuthResult: () => false // Stay on the same page after login
+        signInSuccessWithAuthResult: () => false
     }
 };
 
-// Function to initialize Firebase UI with a retry limit
+// Initialize Firebase UI with retry logic
 let retryCount = 0;
 const MAX_RETRIES = 5;
 
@@ -173,6 +173,11 @@ function transpose(m) {
     ];
 }
 
+// Sound effects
+const agreeSound = new Audio('agree.webm');
+const disagreeSound = new Audio('disagree.webm');
+const levelUpSound = new Audio('lvl-up.webm');
+
 // Star class
 class Star {
     constructor() {
@@ -181,8 +186,8 @@ class Star {
         this.z = Math.random() * 1000;
         this.baseSize = Math.random() * 3 + 2;
         this.resetColorAndOpStat();
-        this.lastX = 0;
-        this.lastY = 0;
+        this.lastX = undefined;
+        this.lastY = undefined;
         this.lastSize = 0;
     }
 
@@ -233,7 +238,16 @@ class Star {
             const scale = focal_length / rotated_pos[2];
             const x = rotated_pos[0] * scale + width / 2;
             const y = rotated_pos[1] * scale + height / 2;
-            const size = Math.max(1, scale * this.baseSize);
+            let size = Math.max(1, scale * this.baseSize);
+            if (streakFactor > 0 && this.lastX !== undefined && this.lastY !== undefined) {
+                ctx.beginPath();
+                ctx.moveTo(this.lastX, this.lastY);
+                ctx.lineTo(x, y);
+                ctx.strokeStyle = `rgba(255, 255, 255, ${streakFactor * 0.5})`;
+                ctx.lineWidth = size / 2;
+                ctx.stroke();
+                size *= (1 + streakFactor); // Glow effect
+            }
             ctx.beginPath();
             ctx.fillStyle = this.color;
             ctx.fillRect(x - size / 2, y - size / 2, size, size);
@@ -250,39 +264,108 @@ const speed = 1;
 const focal_length = 1000;
 
 const expRewards = {
-    '#FFD700': 100,  // Gold: 100 exp
-    'white': 1,      // White: 1 exp
-    '#99FF66': 2,    // Green: 2 exp
-    '#66FFFF': 3,    // Cyan: 3 exp
-    '#9966FF': 10    // Purple: 10 exp
+    '#FFD700': 100,
+    'white': 1,
+    '#99FF66': 2,
+    '#66FFFF': 3,
+    '#9966FF': 10
 };
 
-// Fixed view matrix
-const pitch = -0.48;
-const yaw = 0;
-const cosPitch = Math.cos(pitch);
-const sinPitch = Math.sin(pitch);
-const R_x = [
-    [1, 0, 0],
-    [0, cosPitch, -sinPitch],
-    [0, sinPitch, cosPitch]
-];
-const cosYaw = Math.cos(yaw);
-const sinYaw = Math.sin(yaw);
-const R_y = [
-    [cosYaw, 0, sinYaw],
-    [0, 1, 0],
-    [-sinYaw, 0, cosYaw]
-];
-const R = multiplyMatrices(R_y, R_x);
-const viewMatrix = transpose(R);
+// View control variables
+let pitch = -0.48;
+let yaw = 0;
+const rotationSpeed = 0.01;
+let streakFactor = 0;
+const keysPressed = {
+    KeyW: false,
+    KeyA: false,
+    KeyS: false,
+    KeyD: false,
+    Backquote: false
+};
 
-// Click handler
-canvas.addEventListener('click', (e) => {
-    if (!currentUser) {
-        alert('Please log in to interact with the stars!');
-        return;
+// Event listeners for keyboard controls
+window.addEventListener('keydown', (e) => {
+    if (e.code in keysPressed) {
+        keysPressed[e.code] = true;
     }
+    if (!e.repeat) { // Prevent continuous triggering when held
+        switch (e.code) {
+            case 'ArrowUp':
+                updateUserExp(userExp + 100);
+                break;
+            case 'ArrowDown':
+                updateUserExp(userExp - 100);
+                break;
+            case 'ArrowRight':
+                updateUserExp((Math.floor(userExp / 100) + 1) * 100);
+                break;
+            case 'ArrowLeft':
+                const currentLevel = Math.floor(userExp / 100);
+                updateUserExp(currentLevel > 0 ? (currentLevel - 1) * 100 : 0);
+                break;
+            case 'Digit1':
+                spawnGoldStar();
+                break;
+        }
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.code in keysPressed) {
+        keysPressed[e.code] = false;
+    }
+});
+
+// Update user experience and play level-up sound
+function updateUserExp(newExp) {
+    const previousLevel = Math.floor(userExp / 100);
+    userExp = Math.max(0, newExp);
+    const currentLevel = Math.floor(userExp / 100);
+    if (currentLevel > previousLevel) {
+        levelUpSound.play();
+    }
+}
+
+// Spawn a gold star
+function spawnGoldStar() {
+    if (stars.length >= 1000) {
+        stars.shift(); // Maintain star count
+    }
+    const goldStar = new Star();
+    goldStar.color = '#FFD700';
+    goldStar.assignOpStat();
+    stars.push(goldStar);
+}
+
+// Update view matrix based on pitch and yaw
+let viewMatrix;
+function updateViewMatrix() {
+    const cosPitch = Math.cos(pitch);
+    const sinPitch = Math.sin(pitch);
+    const R_x = [
+        [1, 0, 0],
+        [0, cosPitch, -sinPitch],
+        [0, sinPitch, cosPitch]
+    ];
+    const cosYaw = Math.cos(yaw);
+    const sinYaw = Math.sin(yaw);
+    const R_y = [
+        [cosYaw, 0, sinYaw],
+        [0, 1, 0],
+        [-sinYaw, 0, cosYaw]
+    ];
+    const R = multiplyMatrices(R_y, R_x);
+    viewMatrix = transpose(R);
+}
+
+// Click handler with login check commented out
+canvas.addEventListener('click', (e) => {
+    // Login requirement removed but code preserved for future use
+    // if (!currentUser) {
+    //     alert('Please log in to interact with the stars!');
+    //     return;
+    // }
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
@@ -312,8 +395,14 @@ function openDialogue(star, clickX, clickY) {
     dialogue.style.top = `${top}px`;
 
     const onInteract = async (response) => {
+        // Play sound effects based on response
+        if (response === 'agree') {
+            agreeSound.play();
+        } else if (response === 'disagree') {
+            disagreeSound.play();
+        }
         const reward = expRewards[star.color] || 0;
-        userExp += reward;
+        updateUserExp(userExp + reward);
         if (currentUser) {
             try {
                 const userDocRef = db.collection('users').doc(currentUser.uid);
@@ -341,6 +430,24 @@ function openDialogue(star, clickX, clickY) {
 // Animation loop
 function animate() {
     ctx.clearRect(0, 0, width, height);
+
+    // Update streak effect
+    if (keysPressed.Backquote) {
+        streakFactor = 1;
+    } else {
+        streakFactor = Math.max(0, streakFactor - 0.05);
+    }
+
+    // Adjust view with WASD
+    if (keysPressed.KeyW) pitch -= rotationSpeed; // Look up
+    if (keysPressed.KeyS) pitch += rotationSpeed; // Look down
+    if (keysPressed.KeyA) yaw -= rotationSpeed;   // Look left
+    if (keysPressed.KeyD) yaw += rotationSpeed;   // Look right
+    // Limit pitch to prevent flipping
+    const maxPitch = Math.PI / 2 - 0.01;
+    pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+
+    updateViewMatrix();
 
     stars.forEach(star => {
         star.update(speed);
