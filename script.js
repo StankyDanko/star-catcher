@@ -187,7 +187,7 @@ class Star {
         this.x = Math.random() * 1000 - 500;
         this.y = Math.random() * 1000 - 500;
         this.z = Math.random() * 1000;
-        this.baseSize = Math.random() * 3 + 2;
+        this.baseSize = Math.random() * 6 + 3;
         this.resetColorAndOpStat();
         this.lastX = undefined;
         this.lastY = undefined;
