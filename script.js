@@ -428,6 +428,7 @@ function openDialogue(star, clickX, clickY) {
 }
 
 // Animation loop
+// Animation loop
 function animate() {
     ctx.clearRect(0, 0, width, height);
 
@@ -439,13 +440,18 @@ function animate() {
     }
 
     // Adjust view with WASD
-    if (keysPressed.KeyW) pitch -= rotationSpeed; // Look up
-    if (keysPressed.KeyS) pitch += rotationSpeed; // Look down
-    if (keysPressed.KeyA) yaw -= rotationSpeed;   // Look left
-    if (keysPressed.KeyD) yaw += rotationSpeed;   // Look right
-    // Limit pitch to prevent flipping
-    const maxPitch = Math.PI / 2 - 0.01;
-    pitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+    if (keysPressed.KeyW) pitch -= rotationSpeed;
+    if (keysPressed.KeyS) pitch += rotationSpeed;
+    if (keysPressed.KeyA) yaw -= rotationSpeed;
+    if (keysPressed.KeyD) yaw += rotationSpeed;
+
+    // Limit pitch and yaw to a small range
+    const minPitch = -0.48 - 0.3;  // 
+    const maxPitch = -0.48 + 0.3;  // 
+    const minYaw = -0.3;           // 
+    const maxYaw = 0.3;            // 
+    pitch = Math.max(minPitch, Math.min(maxPitch, pitch));
+    yaw = Math.max(minYaw, Math.min(maxYaw, yaw));
 
     updateViewMatrix();
 

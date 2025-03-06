@@ -1,37 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8">  <!-- Ensures UTF-8 encoding; already present -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Danko's Star Catcher</title>
     <link rel="stylesheet" href="styles.css">
-    <!-- Firebase UI CSS for styling the login interface -->
     <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebaseui/6.0.1/firebaseui.css" />
 </head>
 <body>
     <canvas id="canvas"></canvas>
     <div id="dialogue" style="display: none;">
         <p id="statement"></p>
-        <button id="agree">👍 Agree</button>
-        <button id="disagree">👎 Disagree</button>
+        <button id="disagree">👎 Nope</button>
+        <button id="agree">👍 Yep</button>
     </div>
-    <!-- Login Section -->
     <div id="login-container">
         <button id="login-button">Log In</button>
         <div id="firebaseui-auth-container" style="display: none;"></div>
     </div>
-    <!-- User Info Section -->
     <div id="user-info" style="display: none;">
         <span id="user-name"></span>
         <button id="logout-button">Log Out</button>
     </div>
-    <!-- Firebase SDK Compatibility Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
-    <!-- Firebase UI Script -->
     <script src="https://www.gstatic.com/firebaseui/6.0.1/firebaseui.js"></script>
-    <!-- Load script.js without module type -->
     <script src="script.js"></script>
 </body>
 </html>
