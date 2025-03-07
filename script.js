@@ -103,44 +103,70 @@ async function loadUserData(uid) {
     }
 }
 
+// Define the direction prefixes for all 20 directions
+const directionPrefixes = [
+    "mbti_e",       // MBTI Extraversion
+    "mbti_i",       // MBTI Introversion
+    "mbti_s",       // MBTI Sensing
+    "mbti_n",       // MBTI Intuition
+    "mbti_t",       // MBTI Thinking
+    "mbti_f",       // MBTI Feeling
+    "mbti_j",       // MBTI Judging
+    "mbti_p",       // MBTI Perceiving
+    "pol_left",     // Political Left-wing
+    "pol_right",    // Political Right-wing
+    "pol_auth",     // Political Authoritarian
+    "pol_lib",      // Political Libertarian
+    "media_char",   // Media Character-driven
+    "media_plot",   // Media Plot-driven
+    "media_depth",  // Media Emotional-depth
+    "media_light",  // Media Light-heartedness
+    "media_real",   // Media Realism
+    "media_fantasy",// Media Fantasy
+    "media_complex",// Media Complex
+    "media_simple"  // Media Simple
+];
+
 // Op-Stat queue management
 let opStatQueue = [];
 let isLoadingOpStats = false;
 
-function generateRandomId() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < 20; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
-
-async function loadOpStats() {
-    if (isLoadingOpStats) return;
-    isLoadingOpStats = true;
-    try {
-        const randomId = generateRandomId();
-        const querySnapshot = await db.collection("op-stats")
-            .where('__name__', '>=', randomId)
-            .orderBy('__name__')
-            .limit(10) // Changed from 50 to 10
-            .get();
-        let fetchedOpStats = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        opStatQueue = opStatQueue.concat(shuffleArray(fetchedOpStats));
-    } catch (error) {
-        console.error('Error loading op-stats:', error);
-    } finally {
-        isLoadingOpStats = false;
-    }
-}
-
+// Utility function to shuffle an array (Fisher-Yates algorithm)
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
+}
+
+async function loadOpStats() {
+    if (isLoadingOpStats) return;
+    isLoadingOpStats = true;
+    try {
+        // Generate random op-stat IDs (one per direction)
+        const opStatIds = directionPrefixes.map(prefix => {
+            const randomNumber = Math.floor(Math.random() * 50) + 1;
+            return `${prefix}_${randomNumber}`;
+        });
+
+        // Fetch all 20 op-stats in parallel from Firestore
+        const opStatDocs = await Promise.all(
+            opStatIds.map(id => db.collection("op-stats").doc(id).get())
+        );
+
+        // Filter and map the fetched documents
+        const fetchedOpStats = opStatDocs
+            .filter(doc => doc.exists) // Ensure the document exists
+            .map(doc => ({ id: doc.id, ...doc.data() }));
+
+        // Shuffle and append to the queue
+        opStatQueue = opStatQueue.concat(shuffleArray(fetchedOpStats));
+    } catch (error) {
+        console.error("Error loading op-stats:", error);
+    } finally {
+        isLoadingOpStats = false;
+    }
 }
 
 // Initial load
@@ -436,7 +462,6 @@ function openDialogue(opStat, reward, clickX, clickY) {
             }
         }
         dialogue.style.display = 'none';
-        // Removed queue check here
     };
 
     agreeBtn.onclick = () => onInteract('agree');
