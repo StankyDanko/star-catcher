@@ -12,7 +12,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-// Get UI elements
+// UI Elements
 const loginButton = document.getElementById('login-button');
 const loginContainer = document.getElementById('login-container');
 const logoutButton = document.getElementById('logout-button');
@@ -21,35 +21,36 @@ const userName = document.getElementById('user-name');
 const firebaseuiContainer = document.getElementById('firebaseui-auth-container');
 const levelText = document.getElementById('level-text');
 const progressFill = document.getElementById('progress-fill');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const dialogue = document.getElementById('dialogue');
+const statement = document.getElementById('statement');
+const agreeBtn = document.getElementById('agree');
+const disagreeBtn = document.getElementById('disagree');
 
-// User state
+// User State
 let currentUser = null;
 let userExp = 0;
 
-// Firebase UI configuration
+// Firebase UI Config
 const uiConfig = {
     signInOptions: [
         firebase.auth.GoogleAuthProvider.PROVIDER_ID,
         firebase.auth.TwitterAuthProvider.PROVIDER_ID,
         firebase.auth.EmailAuthProvider.PROVIDER_ID
     ],
-    callbacks: {
-        signInSuccessWithAuthResult: () => false
-    }
+    callbacks: { signInSuccessWithAuthResult: () => false }
 };
 
-// Initialize Firebase UI with retry logic
 let retryCount = 0;
 const MAX_RETRIES = 5;
 
 function initFirebaseUI() {
     if (typeof firebaseui === 'undefined') {
         if (retryCount < MAX_RETRIES) {
-            console.error('Firebase UI not loaded yet. Retrying in 1 second...');
+            console.error('Firebase UI not loaded yet. Retrying...');
             retryCount++;
             setTimeout(initFirebaseUI, 1000);
-        } else {
-            console.error('Failed to load Firebase UI after maximum retries.');
         }
         return;
     }
@@ -57,21 +58,14 @@ function initFirebaseUI() {
     ui.start('#firebaseui-auth-container', uiConfig);
 }
 
-// Show login options
 loginButton.addEventListener('click', () => {
     firebaseuiContainer.style.display = 'block';
     initFirebaseUI();
 });
 
-// Log out
-logoutButton.addEventListener('click', () => {
-    auth.signOut().catch((error) => {
-        console.error('Logout failed:', error);
-    });
-});
+logoutButton.addEventListener('click', () => auth.signOut().catch(error => console.error('Logout failed:', error)));
 
-// Track login state and load user data
-auth.onAuthStateChanged((user) => {
+auth.onAuthStateChanged(user => {
     if (user) {
         currentUser = user;
         userName.textContent = user.displayName || user.email;
@@ -87,51 +81,27 @@ auth.onAuthStateChanged((user) => {
     }
 });
 
-// Load user data from Firestore
 async function loadUserData(uid) {
     try {
         const userDocRef = db.collection('users').doc(uid);
         const userDoc = await userDocRef.get();
-        if (userDoc.exists) {
-            userExp = userDoc.data().exp || 0;
-        } else {
-            await userDocRef.set({ exp: 0 });
-            userExp = 0;
-        }
+        userExp = userDoc.exists ? (userDoc.data().exp || 0) : 0;
+        if (!userDoc.exists) await userDocRef.set({ exp: 0 });
     } catch (error) {
         console.error('Error loading user data:', error);
     }
 }
 
-// Define the direction prefixes for all 20 directions
+// Op-Stat Management
 const directionPrefixes = [
-    "mbti_e",       // MBTI Extraversion
-    "mbti_i",       // MBTI Introversion
-    "mbti_s",       // MBTI Sensing
-    "mbti_n",       // MBTI Intuition
-    "mbti_t",       // MBTI Thinking
-    "mbti_f",       // MBTI Feeling
-    "mbti_j",       // MBTI Judging
-    "mbti_p",       // MBTI Perceiving
-    "pol_left",     // Political Left-wing
-    "pol_right",    // Political Right-wing
-    "pol_auth",     // Political Authoritarian
-    "pol_lib",      // Political Libertarian
-    "media_char",   // Media Character-driven
-    "media_plot",   // Media Plot-driven
-    "media_depth",  // Media Emotional-depth
-    "media_light",  // Media Light-heartedness
-    "media_real",   // Media Realism
-    "media_fantasy",// Media Fantasy
-    "media_complex",// Media Complex
-    "media_simple"  // Media Simple
+    "mbti_e", "mbti_i", "mbti_s", "mbti_n", "mbti_t", "mbti_f", "mbti_j", "mbti_p",
+    "pol_left", "pol_right", "pol_auth", "pol_lib", "media_char", "media_plot",
+    "media_depth", "media_light", "media_real", "media_fantasy", "media_complex", "media_simple"
 ];
 
-// Op-Stat queue management
 let opStatQueue = [];
 let isLoadingOpStats = false;
 
-// Utility function to shuffle an array (Fisher-Yates algorithm)
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -144,23 +114,9 @@ async function loadOpStats() {
     if (isLoadingOpStats) return;
     isLoadingOpStats = true;
     try {
-        // Generate random op-stat IDs (one per direction)
-        const opStatIds = directionPrefixes.map(prefix => {
-            const randomNumber = Math.floor(Math.random() * 50) + 1;
-            return `${prefix}_${randomNumber}`;
-        });
-
-        // Fetch all 20 op-stats in parallel from Firestore
-        const opStatDocs = await Promise.all(
-            opStatIds.map(id => db.collection("op-stats").doc(id).get())
-        );
-
-        // Filter and map the fetched documents
-        const fetchedOpStats = opStatDocs
-            .filter(doc => doc.exists) // Ensure the document exists
-            .map(doc => ({ id: doc.id, ...doc.data() }));
-
-        // Shuffle and append to the queue
+        const opStatIds = directionPrefixes.map(prefix => `${prefix}_${Math.floor(Math.random() * 50) + 1}`);
+        const opStatDocs = await Promise.all(opStatIds.map(id => db.collection("op-stats").doc(id).get()));
+        const fetchedOpStats = opStatDocs.filter(doc => doc.exists).map(doc => ({ id: doc.id, ...doc.data() }));
         opStatQueue = opStatQueue.concat(shuffleArray(fetchedOpStats));
     } catch (error) {
         console.error("Error loading op-stats:", error);
@@ -169,38 +125,21 @@ async function loadOpStats() {
     }
 }
 
-// Initial load
 loadOpStats();
 
-// Canvas setup
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+// Canvas Setup
 let width, height;
-
 function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
 }
-
 window.addEventListener('resize', resize);
 resize();
 
-// Dialogue elements
-const dialogue = document.getElementById('dialogue');
-const statement = document.getElementById('statement');
-const agreeBtn = document.getElementById('agree');
-const disagreeBtn = document.getElementById('disagree');
-
-// Matrix utility functions
+// Matrix Functions
 function multiplyMatrices(m1, m2) {
     let result = [[0,0,0], [0,0,0], [0,0,0]];
-    for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-            for (let k = 0; k < 3; k++) {
-                result[i][j] += m1[i][k] * m2[k][j];
-            }
-        }
-    }
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) for (let k = 0; k < 3; k++) result[i][j] += m1[i][k] * m2[k][j];
     return result;
 }
 
@@ -213,28 +152,37 @@ function multiplyMatrixVector(matrix, vector) {
 }
 
 function transpose(m) {
-    return [
-        [m[0][0], m[1][0], m[2][0]],
-        [m[0][1], m[1][1], m[2][1]],
-        [m[0][2], m[1][2], m[2][2]]
-    ];
+    return [[m[0][0], m[1][0], m[2][0]], [m[0][1], m[1][1], m[2][1]], [m[0][2], m[1][2], m[2][2]]];
 }
 
-// Sound effects
+// Audio
 const agreeSound = new Audio('agree.webm');
 const disagreeSound = new Audio('disagree.webm');
 const levelUpSound = new Audio('lvl-up.webm');
 const catchSound = new Audio('catch.webm');
 
-// Star class
+// Set volume to 50%
+agreeSound.volume = 0.05;
+disagreeSound.volume = 0.05;
+levelUpSound.volume = 0.05;
+catchSound.volume = 0.05;
+
+// Device Detection and Precision
+const isTouchDevice = 'ontouchstart' in window;
+const desktopPrecision = 1.2; // 20% larger hit area
+const mobilePrecision = 2.0; // 100% larger hit area
+const mobileNearMissChance = 0.8; // 80% chance for near misses
+const maxDistance = 100; // Max distance for near-miss consideration
+
+// Star Class
 class Star {
     constructor() {
         this.x = Math.random() * 1000 - 500;
         this.y = Math.random() * 1000 - 500;
         this.z = Math.random() * 1000;
         this.baseSize = Math.random() * 6 + 3;
-        this.resetColor(); // Only set color initially
-        this.opStat = null; // No op-stat until clicked
+        this.resetColor();
+        this.opStat = null;
         this.lastX = undefined;
         this.lastY = undefined;
         this.lastSize = 0;
@@ -242,35 +190,13 @@ class Star {
 
     resetColor() {
         const r = Math.random();
-        if (r < 1 / 10800) {
-            this.color = '#FFD700'; // Gold, rare
-        } else if (r < 0.7) {
-            this.color = 'white';   // White, common
-        } else {
-            const rColored = Math.random();
-            if (rColored < 0.6667) {
-                this.color = '#99FF66'; // Green
-            } else if (rColored < 0.9) {
-                this.color = '#66FFFF'; // Cyan
-            } else {
-                this.color = '#9966FF'; // Purple
-            }
-        }
+        this.color = r < 1 / 10800 ? '#FFD700' : r < 0.7 ? 'white' :
+            (Math.random() < 0.6667 ? '#99FF66' : Math.random() < 0.9 ? '#66FFFF' : '#9966FF');
     }
 
     assignOpStat() {
-        if (opStatQueue.length > 0) {
-            this.opStat = opStatQueue.shift();
-        } else {
-            this.opStat = { text: "Loading...", id: "placeholder" };
-            if (!isLoadingOpStats) {
-                loadOpStats().then(() => {
-                    if (opStatQueue.length > 0) {
-                        this.opStat = opStatQueue.shift();
-                    }
-                });
-            }
-        }
+        this.opStat = opStatQueue.length > 0 ? opStatQueue.shift() : { text: "Loading...", id: "placeholder" };
+        if (opStatQueue.length === 0 && !isLoadingOpStats) loadOpStats();
     }
 
     update(speed) {
@@ -279,8 +205,8 @@ class Star {
             this.x = Math.random() * 1000 - 500;
             this.y = Math.random() * 1000 - 500;
             this.z = 1000;
-            this.resetColor(); // Reset color only
-            this.opStat = null; // Clear op-stat on reset
+            this.resetColor();
+            this.opStat = null;
         }
     }
 
@@ -289,76 +215,137 @@ class Star {
         const rotated_pos = multiplyMatrixVector(viewMatrix, pos);
         if (rotated_pos[2] > 0) {
             const scale = focal_length / rotated_pos[2];
-            const x = rotated_pos[0] * scale + width / 2;
-            const y = rotated_pos[1] * scale + height / 2;
-            let size = Math.max(1, scale * this.baseSize);
+            this.lastX = rotated_pos[0] * scale + width / 2;
+            this.lastY = rotated_pos[1] * scale + height / 2;
+            this.lastSize = Math.max(1, scale * this.baseSize);
             ctx.beginPath();
             ctx.fillStyle = this.color;
-            ctx.fillRect(x - size / 2, y - size / 2, size, size);
-            this.lastX = x;
-            this.lastY = y;
-            this.lastSize = size;
+            ctx.fillRect(this.lastX - this.lastSize / 2, this.lastY - this.lastSize / 2, this.lastSize, this.lastSize);
         }
     }
 }
 
-// Game state
+// Game State
 const stars = Array.from({ length: 500 }, () => new Star());
 const baseSpeed = 1.2;
 const speedFactor = 1.2;
 let speedLevel = 0;
 let speed = baseSpeed * Math.pow(speedFactor, speedLevel);
 const focal_length = 1000;
+const expRewards = { 'white': 1, '#99FF66': 2, '#66FFFF': 4, '#9966FF': 8, '#FFD700': 50 }; // Aligned with old version
 
-const expRewards = {
-    '#FFD700': 50,
-    'white': 1,
-    '#99FF66': 2,
-    '#66FFFF': 4,
-    '#9966FF': 8
-};
-
-// View control variables
+// View Control
 let pitch = -0.48;
 let yaw = 0;
 const rotationSpeed = 0.004;
-const keysPressed = {
-    KeyW: false,
-    KeyA: false,
-    KeyS: false,
-    KeyD: false
-};
+const dragSensitivity = 0.01;
+let isDragging = false;
+let startX, startY;
+const keysPressed = {};
 
-// Event listeners for keyboard controls
-window.addEventListener('keydown', (e) => {
-    if (e.code in keysPressed) {
-        keysPressed[e.code] = true;
-    }
-    if (!e.repeat) {
-        switch (e.code) {
-            case 'ArrowUp':
-                if (speedLevel < 3) {
-                    speedLevel++;
-                    speed = baseSpeed * Math.pow(speedFactor, speedLevel);
-                }
-                break;
-            case 'ArrowDown':
-                if (speedLevel > -3) {
-                    speedLevel--;
-                    speed = baseSpeed * Math.pow(speedFactor, speedLevel);
-                }
-                break;
+// Input Handling
+function handleInput(x, y) {
+    let hitStar = null;
+    let minDistance = Infinity;
+
+    for (let i = stars.length - 1; i >= 0; i--) {
+        const star = stars[i];
+        const dx = x - star.lastX;
+        const dy = y - star.lastY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const precision = isTouchDevice ? mobilePrecision : desktopPrecision;
+        const hitArea = star.lastSize * precision / 2;
+
+        if (distance < hitArea) {
+            hitStar = star;
+            break;
+        } else if (isTouchDevice && distance < minDistance) {
+            minDistance = distance;
+            hitStar = star;
         }
     }
+
+    if (hitStar) {
+        if (isTouchDevice && minDistance > hitStar.lastSize * mobilePrecision / 2) {
+            if (minDistance > maxDistance || Math.random() > mobileNearMissChance) return;
+        }
+        catchSound.play();
+        hitStar.assignOpStat();
+        const reward = expRewards[hitStar.color] || 0;
+        stars.splice(stars.indexOf(hitStar), 1);
+        stars.push(new Star());
+        openDialogue(hitStar.opStat, reward, x, y);
+    }
+}
+
+function openDialogue(opStat, reward, x, y) {
+    dialogue.style.left = `${Math.min(Math.max(x, 100), width - 100)}px`;
+    dialogue.style.top = `${Math.min(Math.max(y, 100), height - 100)}px`;
+    dialogue.style.display = 'block';
+    statement.textContent = opStat.text;
+
+    const handleResponse = (agreed) => {
+        agreeBtn.removeEventListener('click', agreeHandler);
+        disagreeBtn.removeEventListener('click', disagreeHandler);
+        dialogue.style.display = 'none';
+        (agreed ? agreeSound : disagreeSound).play();
+        updateUserExp(userExp + reward); // Update for all players
+        if (currentUser) {
+            db.collection('users').doc(currentUser.uid).update({ exp: userExp });
+        }
+    };
+
+    const agreeHandler = () => handleResponse(true);
+    const disagreeHandler = () => handleResponse(false);
+
+    agreeBtn.addEventListener('click', agreeHandler);
+    disagreeBtn.addEventListener('click', disagreeHandler);
+}
+
+// Touch Controls
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.touches[0].clientX - rect.left;
+        const y = e.touches[0].clientY - rect.top;
+        handleInput(x, y);
+        isDragging = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+    if (isDragging && e.touches.length === 1) {
+        const deltaX = e.touches[0].clientX - startX;
+        const deltaY = e.touches[0].clientY - startY;
+        yaw -= deltaX * dragSensitivity;
+        pitch -= deltaY * dragSensitivity;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }
+}, { passive: false });
+
+canvas.addEventListener('touchend', () => isDragging = false);
+
+// Desktop Controls
+canvas.addEventListener('click', e => {
+    const rect = canvas.getBoundingClientRect();
+    handleInput(e.clientX - rect.left, e.clientY - rect.top);
 });
 
-window.addEventListener('keyup', (e) => {
-    if (e.code in keysPressed) {
-        keysPressed[e.code] = false;
+window.addEventListener('keydown', e => {
+    keysPressed[e.code] = true;
+    if (!e.repeat) {
+        if (e.code === 'ArrowUp' && speedLevel < 3) speed = baseSpeed * Math.pow(speedFactor, ++speedLevel);
+        if (e.code === 'ArrowDown' && speedLevel > -3) speed = baseSpeed * Math.pow(speedFactor, --speedLevel);
     }
 });
 
-// Leveling system functions
+window.addEventListener('keyup', e => keysPressed[e.code] = false);
+
+// Leveling System (Reverted to Old Version)
 function getExpForLevel(level) {
     if (level <= 0) return 0;
     if (level === 1) return 3;
@@ -376,99 +363,23 @@ function getLevel(exp) {
     return 4 + Math.floor((exp - 50) / 50);
 }
 
-// Update user experience and play level-up sound
 function updateUserExp(newExp) {
     const previousLevel = getLevel(userExp);
     userExp = Math.max(0, newExp);
-    const currentLevel = getLevel(userExp);
-    if (currentLevel > previousLevel) {
-        levelUpSound.play();
-    }
+    if (getLevel(userExp) > previousLevel) levelUpSound.play();
 }
 
-// Update view matrix based on pitch and yaw
+// View Matrix
 let viewMatrix;
 function updateViewMatrix() {
-    const cosPitch = Math.cos(pitch);
-    const sinPitch = Math.sin(pitch);
-    const R_x = [
-        [1, 0, 0],
-        [0, cosPitch, -sinPitch],
-        [0, sinPitch, cosPitch]
-    ];
-    const cosYaw = Math.cos(yaw);
-    const sinYaw = Math.sin(yaw);
-    const R_y = [
-        [cosYaw, 0, sinYaw],
-        [0, 1, 0],
-        [-sinYaw, 0, cosYaw]
-    ];
-    const R = multiplyMatrices(R_y, R_x);
-    viewMatrix = transpose(R);
+    const cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
+    const R_x = [[1, 0, 0], [0, cosPitch, -sinPitch], [0, sinPitch, cosPitch]];
+    const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw);
+    const R_y = [[cosYaw, 0, sinYaw], [0, 1, 0], [-sinYaw, 0, cosYaw]];
+    viewMatrix = transpose(multiplyMatrices(R_y, R_x));
 }
 
-// Click handler
-canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    for (let i = stars.length - 1; i >= 0; i--) {
-        const star = stars[i];
-        const { lastX, lastY, lastSize } = star;
-        if (clickX >= lastX - lastSize / 2 && clickX <= lastX + lastSize / 2 &&
-            clickY >= lastY - lastSize / 2 && clickY <= lastY + lastSize / 2) {
-            catchSound.play();
-            star.assignOpStat(); // Assign op-stat only on click
-            const reward = expRewards[star.color] || 0;
-            stars.splice(i, 1);
-            openDialogue(star.opStat, reward, clickX, clickY);
-            break;
-        }
-    }
-});
-
-function openDialogue(opStat, reward, clickX, clickY) {
-    statement.textContent = opStat.text;
-    dialogue.style.display = 'block';
-    const dialogueWidth = dialogue.offsetWidth;
-    const dialogueHeight = dialogue.offsetHeight;
-    let left = clickX - dialogueWidth / 2;
-    let top = clickY + 50;
-    if (left < 0) left = 0;
-    if (left + dialogueWidth > width) left = width - dialogueWidth;
-    if (top + dialogueHeight > height) top = height - dialogueHeight;
-    dialogue.style.left = `${left}px`;
-    dialogue.style.top = `${top}px`;
-
-    const onInteract = async (response) => {
-        if (response === 'agree') {
-            agreeSound.play();
-        } else if (response === 'disagree') {
-            disagreeSound.play();
-        }
-        updateUserExp(userExp + reward);
-        if (currentUser) {
-            try {
-                const userDocRef = db.collection('users').doc(currentUser.uid);
-                await userDocRef.update({ exp: userExp });
-                await db.collection(`users/${currentUser.uid}/responses`).add({
-                    opStatId: opStat.id,
-                    response: response,
-                    timestamp: new Date()
-                });
-            } catch (error) {
-                console.error('Error updating user data:', error);
-            }
-        }
-        dialogue.style.display = 'none';
-    };
-
-    agreeBtn.onclick = () => onInteract('agree');
-    disagreeBtn.onclick = () => onInteract('disagree');
-}
-
-// Animation loop
+// Animation Loop
 let startTime = null;
 let nextGoldSpawnTime = 45;
 
@@ -476,11 +387,9 @@ function animate(timestamp) {
     if (!startTime) startTime = timestamp;
     const elapsed = (timestamp - startTime) / 1000;
 
-    // Gold star spawning
     if (elapsed >= nextGoldSpawnTime) {
         const goldStar = new Star();
         goldStar.color = '#FFD700';
-        // No op-stat assigned here; assigned on click
         if (stars.length >= 1000) stars.shift();
         stars.push(goldStar);
         nextGoldSpawnTime += 60;
@@ -488,32 +397,19 @@ function animate(timestamp) {
 
     ctx.clearRect(0, 0, width, height);
 
-    // Adjust view with WASD
-    if (keysPressed.KeyS) pitch -= rotationSpeed;
     if (keysPressed.KeyW) pitch += rotationSpeed;
+    if (keysPressed.KeyS) pitch -= rotationSpeed;
     if (keysPressed.KeyA) yaw -= rotationSpeed;
     if (keysPressed.KeyD) yaw += rotationSpeed;
 
-    // Limit pitch and yaw
-    const minPitch = -0.48 - 0.3;
-    const maxPitch = -0.48 + 0.3;
-    const minYaw = -0.3;
-    const maxYaw = 0.3;
-    pitch = Math.max(minPitch, Math.min(maxPitch, pitch));
-    yaw = Math.max(minYaw, Math.min(maxYaw, yaw));
-
+    pitch = Math.max(-0.78, Math.min(-0.18, pitch));
+    yaw = Math.max(-0.3, Math.min(0.3, yaw));
     updateViewMatrix();
 
-    // Update all stars
     stars.forEach(star => star.update(speed));
-
-    // Sort stars by z-position
     stars.sort((a, b) => b.z - a.z);
-
-    // Draw all stars
     stars.forEach(star => star.draw());
 
-    // Calculate level and progress
     const level = getLevel(userExp);
     let progress;
     if (level === 0) {
@@ -524,14 +420,10 @@ function animate(timestamp) {
         progress = (userExp - expForCurrentLevel) / (expForNextLevel - expForCurrentLevel);
     }
 
-    // Update stat-box
     levelText.textContent = `Level: ${level}`;
     progressFill.style.width = `${progress * 100}%`;
 
-    // Refill op-stat queue if low
-    if (opStatQueue.length < 3 && !isLoadingOpStats) {
-        loadOpStats();
-    }
+    if (opStatQueue.length < 3 && !isLoadingOpStats) loadOpStats();
 
     requestAnimationFrame(animate);
 }
